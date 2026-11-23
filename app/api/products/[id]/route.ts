@@ -1,0 +1,9 @@
+import { NextRequest,NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { userId } from '@/lib/auth';
+import { productInput } from '@/lib/validate';
+type C={params:Promise<{id:string}>};
+async function access(req:NextRequest,ctx:C){const ownerId=await userId(req);const id=Number((await ctx.params).id);return {ownerId,id,valid:Number.isSafeInteger(id)&&id>0};}
+export async function GET(req:NextRequest,ctx:C){const a=await access(req,ctx);if(!a.ownerId)return NextResponse.json({error:'No autorizado'},{status:401});if(!a.valid)return NextResponse.json({error:'ID inválido'},{status:400});const item=await prisma.product.findFirst({where:{id:a.id,ownerId:a.ownerId}});return item?NextResponse.json(item):NextResponse.json({error:'Producto no encontrado'},{status:404});}
+export async function PUT(req:NextRequest,ctx:C){const a=await access(req,ctx);if(!a.ownerId)return NextResponse.json({error:'No autorizado'},{status:401});if(!a.valid)return NextResponse.json({error:'ID inválido'},{status:400});try{const data=productInput(await req.json());if(!data)return NextResponse.json({error:'Datos inválidos'},{status:400});const result=await prisma.product.updateMany({where:{id:a.id,ownerId:a.ownerId},data});if(!result.count)return NextResponse.json({error:'Producto no encontrado'},{status:404});return NextResponse.json(await prisma.product.findUnique({where:{id:a.id}}));}catch{return NextResponse.json({error:'Solicitud inválida'},{status:400});}}
+export async function DELETE(req:NextRequest,ctx:C){const a=await access(req,ctx);if(!a.ownerId)return NextResponse.json({error:'No autorizado'},{status:401});if(!a.valid)return NextResponse.json({error:'ID inválido'},{status:400});const result=await prisma.product.deleteMany({where:{id:a.id,ownerId:a.ownerId}});return result.count?NextResponse.json({message:'Producto eliminado'}):NextResponse.json({error:'Producto no encontrado'},{status:404});}
